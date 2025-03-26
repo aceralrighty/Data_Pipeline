@@ -1,22 +1,43 @@
-import pandas as pd
+import os
 
-# From CSV
-df_csv = pd.read_csv('data.csv')
+import requests
+from apscheduler.schedulers.blocking import BlockingScheduler
+import psycopg2
+from datetime import datetime
+import dotenv
 
-# From JSON
-df_json = pd.read_json('data.json')
+API_KEY = os.getenv("API_KEY")
+URL = os.getenv("URL")
+CITY = os.getenv("CITY")
 
-# From SQL database
-from sqlalchemy import create_engine
-engine = create_engine('postgresql://user:password@host:3306/database')
-df_sql = pd.read_sql_query('SELECT * FROM raw_data', engine)
-# Data Cleaning
-pd['column_name'].fillna(0, inplace=True) # Handle missing values
-pd.drop_duplicates(inplace=True) # Remove duplicates
+DB_PARAMS = {
+    "dbname": "weather",
+    "user": "postgres",
+    "password": "password",
+    "host": "localhost",
+    "port": "5432",
+}
+def fetch_weather():
+    response = requests.get(URL)
+    data = response.json()
 
-# Data Transformation
-pd['new_column'] = pd['column1'] + pd['column2'] # Create new columns
-pd['date_column'] = pd.to_datetime(pd['date_column']) # Convert data types
+    temp = data['main']['temp'] - 273.15
+    humidity = data['main']['humidity']
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
-pd.to_csv('cleaned_data.csv', index=False)
-pd.to_sql('cleaned_data', engine)
+    conn = psycopg2.connect(**DB_PARAMS)
+    cur = conn.cursor()
+    cur.execute(cur.execute("""
+        INSERT INTO weather (city, temperature, humidity, timestamp)
+        VALUES (%s, %s, %s, %s)
+    """, (CITY, temp, humidity, timestamp)))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+schedule = BlockingScheduler()
+schedule.add_job(fetch_weather, 'interval', minutes=20)
+schedule.start()
+
+if __name__ == '__main__':
+    fetch_weather()
