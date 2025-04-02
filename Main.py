@@ -4,19 +4,23 @@ import requests
 from apscheduler.schedulers.blocking import BlockingScheduler
 import psycopg2
 from datetime import datetime
-import dotenv
+
+from flask.cli import load_dotenv
+
+load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
 URL = os.getenv("URL")
 CITY = os.getenv("CITY")
-
 DB_PARAMS = {
-    "dbname": "weather",
+    "dbname": "weather_db",
     "user": "postgres",
     "password": "password",
     "host": "localhost",
     "port": "5432",
 }
+
+
 def fetch_weather():
     response = requests.get(URL)
     data = response.json()
@@ -35,8 +39,9 @@ def fetch_weather():
     cur.close()
     conn.close()
 
+
 schedule = BlockingScheduler()
-schedule.add_job(fetch_weather, 'interval', minutes=20)
+schedule.add_job(fetch_weather, 'interval', minutes=30)
 schedule.start()
 
 if __name__ == '__main__':
